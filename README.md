@@ -4,6 +4,47 @@
 
 I plan to use OpenMapTiles with a custom style for NST Guide. I still haven't figured out how to change the generated zooms. Otherwise, the general overview is:
 
+Just changing `QUICKSTART_MAX_ZOOM` in `.env` doesn't necessarily change the
+actual zoom output. Maybe it does only when it redownloads the `.osm.pbf` from
+Geofabrik, but when the `.osm.pbf` already exists, it doesn't create a new
+`docker-compose-config.yml`. I found that I needed to manually change the
+`MAX_ZOOM` in `data/docker-compose-config.yml`.
+
+You may also want to try importing multiple `.osm.pbf` files before generating
+the vector tiles. Note that you'd want to manually modify the bbox and name of
+`data/docker-compose-config.yml`
+
+```bash
+osm_area="washington"
+testdata=${osm_area}.osm.pbf
+# Downloads Geofabrik data, imports it, and then also creates `docker-compose-config.yml`?
+docker-compose run --rm import-osm  ./download-geofabrik.sh ${osm_area}
+make clean
+docker-compose up -d postgres
+make forced-clean-sql
+docker-compose run --rm import-water
+docker-compose run --rm import-osmborder
+docker-compose run --rm import-natural-earth
+docker-compose run --rm import-lakelines
+docker-compose run --rm import-osm
+docker-compose run --rm import-wikidata
+docker-compose run --rm import-sql
+make psql-analyze
+
+# Then do the above steps again for more osm_areas before generating the vector tiles.
+
+docker-compose up -d postserve
+# Use pre-computed docker-compose-config.yml here?
+docker-compose -f docker-compose.yml -f ./data/docker-compose-config.yml  run --rm generate-vectortiles
+docker-compose run --rm openmaptiles-tools  generate-metadata ./data/tiles.mbtiles
+docker-compose run --rm openmaptiles-tools  chmod 666         ./data/tiles.mbtiles
+docker-compose stop postgres
+```
+
+Otherwise, if you want to stick with `quickstart.sh` as much as possible, it
+should be possible to generate west-coast tiles with the following, joining
+mbtiles with `tile-join`.
+
 ```bash
 git clone https://github.com/nst-guide/openmaptiles.git
 cd ./openmaptiles
