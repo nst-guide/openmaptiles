@@ -1,5 +1,34 @@
 ## OpenMapTiles [![Build Status](https://travis-ci.org/openmaptiles/openmaptiles.svg?branch=master)](https://travis-ci.org/openmaptiles/openmaptiles)
 
+## Fork Overview
+
+I plan to use OpenMapTiles with a custom style for NST Guide. I still haven't figured out how to change the generated zooms. Otherwise, the general overview is:
+
+```bash
+git clone https://github.com/nst-guide/openmaptiles.git
+cd ./openmaptiles
+# Download all necessary OpenMapTiles programs
+docker-compose pull
+# Download and import Geofabrik extracts
+./quickstart washington
+mv data/tiles.mbtiles ./washington.mbtiles
+./quickstart oregon
+mv data/tiles.mbtiles ./oregon.mbtiles
+./quickstart california
+mv data/tiles.mbtiles ./california.mbtiles
+# Join the separate mbtiles into one
+# tile-join comes from tippecanoe
+# https://github.com/mapbox/tippecanoe
+tile-join -o joined.mbtiles washington.mbtiles oregon.mbtiles california.mbtiles
+# Export the mbtiles into a directory
+# https://github.com/mapbox/mbutil
+mb-util joined.mbtiles tiles
+# Upload the directory of tiles to S3
+aws s3 cp tiles s3://tiles.nst.guide/{directory}/ --recursive --content-type application/x-protobuf --content-encoding 'gzip'
+```
+
+## OpenMapTiles Overview
+
 OpenMapTiles is an extensible and open tile schema based on the OpenStreetMap. This project is used to generate vector tiles for online zoomable maps. OpenMapTiles is about creating a beautiful basemaps with general layers containing topographic information. More information [openmaptiles.org](https://openmaptiles.org/) and [openmaptiles.com](https://openmaptiles.com/).
 
 We encourage you to collaborate, reuse and adapt existing layers, or add your own layers. You may use our approach for your own vector tile project. Feel free to fork the repo and experiment. The repository is built on top of the [openmaptiles/openmaptiles-tools](https://github.com/openmaptiles/openmaptiles-tools) to simplify vector tile creation.
