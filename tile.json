@@ -1,0 +1,15 @@
+{
+    "tilejson": "2.2.0",
+    "name": "openmaptiles",
+    "description": "OpenMapTiles",
+    "version": "0.1.0",
+    "attribution": "<a href=\"https://openmaptiles.org/\" target=\"_blank\">© OpenMapTiles</a> <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">© OpenStreetMap contributors</a>",
+    "scheme": "xyz",
+    "tiles": [
+        "https://tiles.nst.guide/openmaptiles/{z}/{x}/{y}.pbf"
+    ],
+    "minzoom": 0,
+    "maxzoom": 14,
+    "bounds": [-126.94,30.74,-105.37,49.87],
+    "center": [ -120.673828,48.864681,1 ]
+}
