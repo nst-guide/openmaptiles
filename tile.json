@@ -6,7 +6,9 @@
     "attribution": "<a href=\"https://openmaptiles.org/\" target=\"_blank\">© OpenMapTiles</a> <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">© OpenStreetMap contributors</a>",
     "scheme": "xyz",
     "tiles": [
-        "https://tiles.nst.guide/openmaptiles/{z}/{x}/{y}.pbf"
+        "https://atiles.nst.guide/openmaptiles/{z}/{x}/{y}.pbf",
+        "https://btiles.nst.guide/openmaptiles/{z}/{x}/{y}.pbf",
+        "https://ctiles.nst.guide/openmaptiles/{z}/{x}/{y}.pbf"
     ],
     "minzoom": 0,
     "maxzoom": 14,
