@@ -31,7 +31,9 @@ More documentation is in `QUICKSTART.md`.
 
 ### Hosting on S3
 
-I use S3 + Cloudflare for fast, cheap hosting of map tiles. OpenMapTiles should
+I use S3 + Cloudflare for fast, cheap hosting of map tiles.
+[(Great tutorial for using S3 for serverless map hosting)](https://github.com/addresscloud/serverless-tiles)
+OpenMapTiles should
 generate an output file like `data/tiles.mbtiles`. To upload to S3, first
 convert that `.mbtiles` to a directory of individual tiles with [`mb-util`](https://github.com/mapbox/mbutil):
 ```
