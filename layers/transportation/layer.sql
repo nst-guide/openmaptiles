@@ -174,7 +174,9 @@ indoor INT, bicycle TEXT, foot TEXT, horse TEXT, mtb_scale TEXT, surface TEXT) A
             ) AND man_made <> 'pier'
             OR zoom_level = 13
                 AND (
-                    man_made = 'pier' AND NOT ST_IsClosed(geometry)
+                    man_made <> 'pier'
+                OR
+                    NOT ST_IsClosed(geometry)
                 )
             OR zoom_level >= 14
                 AND (
