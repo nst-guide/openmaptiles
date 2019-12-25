@@ -2,71 +2,202 @@
 
 ## Fork Overview
 
-I plan to use OpenMapTiles with a custom style for NST Guide. I still haven't figured out how to change the generated zooms. Otherwise, the general overview is:
+I use OpenMapTiles with a [custom topographic
+fork](https://github.com/nst-guide/osm-liberty-topo) of the popular [OSM
+Liberty](https://github.com/maputnik/osm-liberty) style for the National Scenic
+Trails Guide project.
 
-Just changing `QUICKSTART_MAX_ZOOM` in `.env` doesn't necessarily change the
-actual zoom output. Maybe it does only when it redownloads the `.osm.pbf` from
-Geofabrik, but when the `.osm.pbf` already exists, it doesn't create a new
-`docker-compose-config.yml`. I found that I needed to manually change the
-`MAX_ZOOM` in `data/docker-compose-config.yml`.
+Fork changes:
 
-You may also want to try importing multiple `.osm.pbf` files before generating
-the vector tiles. Note that you'd want to manually modify the bbox and name of
-`data/docker-compose-config.yml`
+- Encodes waterways and trails into the vector tiles at a lower zoom than the
+  original OpenMapTiles project, so that they can be displayed when more zoomed
+  out.
+- Removes multi-language support in `openmaptiles.yaml`. This _should_ make the
+  file sizes slightly smaller by not encoding names of OSM features in foreign
+  languages. My map is English-only so this should be fine.
 
+## Generating tiles
+
+I've found that changing `QUICKSTART_MAX_ZOOM` in `.env` doesn't change the
+actual zoom output _when the `.osm.pbf` extract already exists_. It's a good
+idea to set `QUICKSTART_MAX_ZOOM` to a lower level like 7 to make sure the
+OpenMapTiles docker toolchain is working on your computer.
+
+After you've made sure that OpenMapTiles is working, delete the `.osm.pbf`
+extract from the `data/` folder, change `QUICKSTART_MAX_ZOOM`, and then run
+`./quickstart` again.
+
+More documentation is in `QUICKSTART.md`.
+
+### Hosting on S3
+
+I use S3 + Cloudflare for fast, cheap hosting of map tiles. OpenMapTiles should
+generate an output file like `data/tiles.mbtiles`. To upload to S3, first
+convert that `.mbtiles` to a directory of individual tiles with [`mb-util`](https://github.com/mapbox/mbutil):
+```
+mb-util tiles.mbtiles tiles --image_format=pbf
+```
+Note that you must provide `--image_format=pbf`, otherwise the individual files
+will have `.png` extensions.
+
+Then once you have a directory of files, you can recursively upload to S3 with
 ```bash
-osm_area="washington"
-testdata=${osm_area}.osm.pbf
-# Downloads Geofabrik data, imports it, and then also creates `docker-compose-config.yml`?
-docker-compose run --rm import-osm  ./download-geofabrik.sh ${osm_area}
-make clean
-docker-compose up -d postgres
-make forced-clean-sql
-docker-compose run --rm import-water
-docker-compose run --rm import-osmborder
-docker-compose run --rm import-natural-earth
-docker-compose run --rm import-lakelines
-docker-compose run --rm import-osm
-docker-compose run --rm import-wikidata
-docker-compose run --rm import-sql
-make psql-analyze
+aws s3 cp tiles s3://{bucket_name}/openmaptiles/ \
+    --recursive \
+    --content-type application/x-protobuf \
+    --content-encoding "gzip" \
+    --cache-control "public, max-age=2592000, stale-while-revalidate=31536000"
+```
+I've found that the tiles won't display properly if the `--content-encoding
+"gzip"` tag isn't set. You should edit the `cache-control` to something suitable
+for your project. I don't plan to update the OSM maps more than once a month, so
+this caching should help keep bandwidth costs down.
 
-# Then do the above steps again for more osm_areas before generating the vector tiles.
+### Combining multiple geographies
 
-docker-compose up -d postserve
-# Use pre-computed docker-compose-config.yml here?
-docker-compose -f docker-compose.yml -f ./data/docker-compose-config.yml  run --rm generate-vectortiles
-docker-compose run --rm openmaptiles-tools  generate-metadata ./data/tiles.mbtiles
-docker-compose run --rm openmaptiles-tools  chmod 666         ./data/tiles.mbtiles
-docker-compose stop postgres
+I'm interested in combining OSM data from multiple Geofabrik regions, but I
+don't want to use the next higher level in the hierarchy. For example, I want to
+render California, Oregon, and Washington, but not all of the US or even
+US-west.
+
+There are a couple possible ways to do this.
+
+1. After you run `./quickstart.sh` for each region, move the generated `.mbtiles` file out of the `data/` directory (the `.mbtiles` files are removed at the beginning of each run of `./quickstart.sh`). Then once you have multiple generated `.mbtiles` files, use [`tile-join` (within the Tippecanoe project)](https://github.com/mapbox/tippecanoe) to join them into a single `.mbtiles` file. Then finally run `mb-util` as above to export to a single directory.
+
+    It should look something like this:
+
+    ```bash
+    git clone https://github.com/nst-guide/openmaptiles.git
+    cd ./openmaptiles
+    # Download all necessary OpenMapTiles programs
+    docker-compose pull
+    # Download and import Geofabrik extracts
+    ./quickstart washington
+    mv data/tiles.mbtiles ./washington.mbtiles
+    ./quickstart oregon
+    mv data/tiles.mbtiles ./oregon.mbtiles
+    ./quickstart california
+    mv data/tiles.mbtiles ./california.mbtiles
+    # Join the separate mbtiles into one
+    # tile-join comes from tippecanoe
+    # https://github.com/mapbox/tippecanoe
+    tile-join -o joined.mbtiles washington.mbtiles oregon.mbtiles california.mbtiles
+    # Export the mbtiles into a directory
+    # https://github.com/mapbox/mbutil
+    mb-util joined.mbtiles tiles
+    # Upload the directory of tiles to S3
+    aws s3 cp tiles s3://{bucket_name}/openmaptiles/ \
+        --recursive \
+        --content-type application/x-protobuf \
+        --content-encoding "gzip" \
+        --cache-control "public, max-age=2592000, stale-while-revalidate=31536000"
+    ```
+
+2. Since I'm using S3 for static tile hosting, you could probably generate each state, export each `.mbtiles` file to a directory, then upload each directory individually, though I haven't tested this. Something like:
+
+    ```bash
+    git clone https://github.com/nst-guide/openmaptiles.git
+    cd ./openmaptiles
+    # Download all necessary OpenMapTiles programs
+    docker-compose pull
+    # Run for washington
+    ./quickstart washington
+    mb-util data/tiles.mbtiles washington
+    aws s3 cp washington s3://{bucket_name}/openmaptiles/ \
+        --recursive \
+        --content-type application/x-protobuf \
+        --content-encoding "gzip" \
+        --cache-control "public, max-age=2592000, stale-while-revalidate=31536000"
+
+    # Run for oregon
+    ./quickstart oregon
+    mb-util data/tiles.mbtiles oregon
+    aws s3 cp oregon s3://{bucket_name}/openmaptiles/ \
+        --recursive \
+        --content-type application/x-protobuf \
+        --content-encoding "gzip" \
+        --cache-control "public, max-age=2592000, stale-while-revalidate=31536000"
+
+    # Run for california
+    ./quickstart california
+    mb-util data/tiles.mbtiles california
+    aws s3 cp california s3://{bucket_name}/openmaptiles/ \
+        --recursive \
+        --content-type application/x-protobuf \
+        --content-encoding "gzip" \
+        --cache-control "public, max-age=2592000, stale-while-revalidate=31536000"
+    ```
+
+3. You could also try importing multiple `.osm.pbf` files _before generating
+    the vector tiles_. I haven't tried this method in detail either. Note that
+    you might need to manually modify the bbox and name within
+    `data/docker-compose-config.yml`.
+
+    This _should_ be a valid way to import multiple OSM extracts into the
+    Postgres instance within the docker setup. You should be able to import as
+    many extracts as you have disk space for, and then run the vector tile
+    creation on the complete database.
+
+    I'd recommend reading `quickstart.sh` in more detail, as that contains all
+    these steps with some comments.
+
+    ```bash
+    osm_area="washington"
+    testdata=${osm_area}.osm.pbf
+    # Downloads Geofabrik data, imports it, and then also creates `docker-compose-config.yml`?
+    docker-compose run --rm import-osm  ./download-geofabrik.sh ${osm_area}
+    make clean
+    docker-compose up -d postgres
+    make forced-clean-sql
+    docker-compose run --rm import-water
+    docker-compose run --rm import-osmborder
+    docker-compose run --rm import-natural-earth
+    docker-compose run --rm import-lakelines
+    docker-compose run --rm import-osm
+    docker-compose run --rm import-wikidata
+    docker-compose run --rm import-sql
+    make psql-analyze
+
+    # Then do the above steps again for more osm_areas before generating the vector tiles.
+
+    docker-compose up -d postserve
+    # Use pre-computed docker-compose-config.yml here?
+    docker-compose -f docker-compose.yml -f ./data/docker-compose-config.yml  run --rm generate-vectortiles
+    docker-compose run --rm openmaptiles-tools  generate-metadata ./data/tiles.mbtiles
+    docker-compose run --rm openmaptiles-tools  chmod 666         ./data/tiles.mbtiles
+    docker-compose stop postgres
+    ```
+
+## Using generated tiles
+
+To use these tiles, you'll need to add a `tile.json` file that describes the
+data you've generated. This should conform to the [Tile JSON
+specification](https://github.com/mapbox/tilejson-spec/tree/master/2.2.0).
+
+It should look something like this, though you'll need to change the `tiles`
+endpoint and update the `maxzoom`, `bounds`, and `center` for your own data
+extract:
+```json
+{
+    "tilejson": "2.2.0",
+    "name": "openmaptiles",
+    "description": "OpenMapTiles",
+    "version": "0.1.0",
+    "attribution": "<a href=\"https://openmaptiles.org/\" target=\"_blank\">© OpenMapTiles</a> <a href=\"https://www.openstreetmap.org/copyright\" target=\"_blank\">© OpenStreetMap contributors</a>",
+    "scheme": "xyz",
+    "tiles": [
+        "https://{bucket_name}/openmaptiles/{z}/{x}/{y}.pbf"
+    ],
+    "minzoom": 0,
+    "maxzoom": 14,
+    "bounds": [-125.3321, 23.8991, -65.7421, 49.4325],
+    "center": [-120.673828, 48.864681, 1]
+}
 ```
 
-Otherwise, if you want to stick with `quickstart.sh` as much as possible, it
-should be possible to generate west-coast tiles with the following, joining
-mbtiles with `tile-join`.
-
-```bash
-git clone https://github.com/nst-guide/openmaptiles.git
-cd ./openmaptiles
-# Download all necessary OpenMapTiles programs
-docker-compose pull
-# Download and import Geofabrik extracts
-./quickstart washington
-mv data/tiles.mbtiles ./washington.mbtiles
-./quickstart oregon
-mv data/tiles.mbtiles ./oregon.mbtiles
-./quickstart california
-mv data/tiles.mbtiles ./california.mbtiles
-# Join the separate mbtiles into one
-# tile-join comes from tippecanoe
-# https://github.com/mapbox/tippecanoe
-tile-join -o joined.mbtiles washington.mbtiles oregon.mbtiles california.mbtiles
-# Export the mbtiles into a directory
-# https://github.com/mapbox/mbutil
-mb-util joined.mbtiles tiles
-# Upload the directory of tiles to S3
-aws s3 cp tiles s3://tiles.nst.guide/{directory}/ --recursive --content-type application/x-protobuf --content-encoding 'gzip'
-```
+Then any time you'd pass a mapbox source, like
+`mapbox://styles/mapbox/streets-v11`, instead pass the URL to your own
+`tile.json` file.
 
 ## OpenMapTiles Overview
 
@@ -89,7 +220,8 @@ You can start from several GL styles supporting the OpenMapTiles vector schema.
 
 :link: [Learn how to create Mapbox GL styles with Maputnik and OpenMapTiles](http://openmaptiles.org/docs/style/maputnik/).
 
-
+- [OSM Liberty Topo](https://github.com/nst-guide/osm-liberty-topo)
+- [OSM Liberty](https://github.com/maputnik/osm-liberty)
 - [OSM Bright](https://github.com/openmaptiles/osm-bright-gl-style)
 - [Positron](https://github.com/openmaptiles/positron-gl-style)
 - [Dark Matter](https://github.com/openmaptiles/dark-matter-gl-style)
@@ -97,7 +229,6 @@ You can start from several GL styles supporting the OpenMapTiles vector schema.
 - [Klokantech 3D](https://github.com/openmaptiles/klokantech-3d-gl-style)
 - [Fiord Color](https://github.com/openmaptiles/fiord-color-gl-style)
 - [Toner](https://github.com/openmaptiles/toner-gl-style)
-- [OSM Liberty](https://github.com/maputnik/osm-liberty)
 
 We also ported over our favorite old raster styles (TM2).
 
