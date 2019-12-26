@@ -168,10 +168,12 @@ indoor INT, bicycle TEXT, foot TEXT, horse TEXT, mtb_scale TEXT, surface TEXT) A
             z_order
         FROM osm_highway_linestring
         WHERE NOT is_area AND (
-            zoom_level = 12 AND (
-                highway_class(highway, public_transport, construction) NOT IN ('track', 'path', 'minor')
-                OR highway IN ('unclassified', 'residential')
-            ) AND man_made <> 'pier'
+            zoom_level = 12
+                AND (
+                    man_made <> 'pier'
+                OR
+                    NOT ST_IsClosed(geometry)
+                )
             OR zoom_level = 13
                 AND (
                     man_made <> 'pier'
