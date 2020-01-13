@@ -93,7 +93,16 @@ There are a couple possible ways to do this.
         --cache-control "public, max-age=2592000, stale-while-revalidate=31536000"
     ```
 
-2. Since I'm using S3 for static tile hosting, you could probably generate each state, export each `.mbtiles` file to a directory, then upload each directory individually, though I haven't tested this. Something like:
+2. ~~Since I'm using S3 for static tile hosting, you could probably generate each state, export each `.mbtiles` file to a directory, then upload each directory individually, though I haven't tested this.~~
+
+    **Edit: This doesn't work**, because if you generate tiles for the state of
+    Oregon, you'll have tiles that should be shared with other states that are
+    missing data. See [issue
+    #2](https://github.com/nst-guide/openmaptiles/issues/2) for an example. So
+    it's necessary to combine extracts with `tile-join` before uploading, even
+    if you're only updating part of a region.
+
+    Something like:
 
     ```bash
     git clone https://github.com/nst-guide/openmaptiles.git
