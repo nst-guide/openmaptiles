@@ -118,6 +118,7 @@ def_poi_mapping_leisure: &poi_mapping_leisure
 # natural values: see http://taginfo.openstreetmap.org/keys/natural#values
 def_poi_mapping_natural: &poi_mapping_natural
   - spring
+  - saddle
 
 # railway values , see http://taginfo.openstreetmap.org/keys/railway#values
 def_poi_mapping_railway: &poi_mapping_railway
