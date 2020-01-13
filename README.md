@@ -12,9 +12,7 @@ Fork changes:
 - Encodes waterways and trails into the vector tiles at a lower zoom than the
   original OpenMapTiles project, so that they can be displayed when more zoomed
   out.
-- Removes multi-language support in `openmaptiles.yaml`. This _should_ make the
-  file sizes slightly smaller by not encoding names of OSM features in foreign
-  languages. My map is English-only so this should be fine.
+- Adds `natural=spring` and `amenity=drinking_water` to the POI layer.
 
 ## Generating tiles
 
