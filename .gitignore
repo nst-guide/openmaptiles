@@ -1,3 +1,6 @@
+*.mbtiles
+*.mbtiles-journal
+
 # Mapnik XML
 data.xml
 *.thumb.png
