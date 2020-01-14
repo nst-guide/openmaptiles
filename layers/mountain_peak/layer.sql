@@ -26,12 +26,8 @@ $$
     tags,
     ele::int,
     rank::int FROM (
-      SELECT osm_id, geometry, name,
-      COALESCE(NULLIF(name_en, ''), name) AS name_en,
-      COALESCE(NULLIF(name_de, ''), name, name_en) AS name_de,
-      tags,
+      SELECT osm_id, geometry, name, wikidata, tags,
       substring(ele from E'^(-?\\d+)(\\D|$)')::int AS ele,
-      round(substring(ele from E'^(-?\\d+)(\\D|$)')::int*3.2808399)::int AS ele_ft,
       row_number() OVER (
           PARTITION BY LabelGrid(geometry, 100 * pixel_width)
           ORDER BY (
