@@ -1,3 +1,5 @@
+mbtiles/
+mbtiles.bak/
 *.mbtiles
 *.mbtiles-journal
 
