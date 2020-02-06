@@ -46,4 +46,6 @@ $$
     (zoom_level >= 14)
   ORDER BY "rank" ASC;
 
-$$ LANGUAGE SQL IMMUTABLE;
+$$
+LANGUAGE SQL
+IMMUTABLE PARALLEL SAFE;
